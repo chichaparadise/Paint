@@ -6,6 +6,9 @@
 #include <memory>
 #include <gdiplus.h>
 
+#include <ShellScalingApi.h>
+
+
 #define IDM_CLEAR      10000
 #define IDM_RECTPRESS  10001
 #define IDM_ELLIPPRESS 10002
@@ -16,6 +19,7 @@
 #define IDM_FILL       10013
 
 #pragma comment(lib, "d2d1")
+#pragma comment(lib, "Shcore.lib")
 
 
 using namespace std;
@@ -68,9 +72,9 @@ public:
 		HWND hWndParent = 0,
 		DWORD dwExStyle = 0,
 		int x = CW_USEDEFAULT,
-		int y = 0,
+		int y = CW_USEDEFAULT,
 		int nWidth = CW_USEDEFAULT,
-		int nHeight = 0,
+		int nHeight = CW_USEDEFAULT,
 		HMENU hMenu = 0
 	)
 	{
@@ -259,7 +263,7 @@ class MainWindow : public BaseWindow<MainWindow>
 	enum Shape
 	{
 		Ellipse,
-		Rectangle,
+		Rect,
 		Pen
 	};
 	
@@ -291,7 +295,7 @@ class MainWindow : public BaseWindow<MainWindow>
 	ID2D1LinearGradientBrush* gradBrush;
 	FLOAT                     strokeWidth;
 
-	HDC                       hdc;
+	RECT                      scene;
 
 	D2D1_LINEAR_GRADIENT_BRUSH_PROPERTIES gradPros;
 
@@ -352,7 +356,15 @@ HRESULT MainWindow::CreateGraphicsResources()
 			D2D1::HwndRenderTargetProperties(m_hwnd, size),
 			&pRenderTarget);
 
-		//Rectangle(hdc, rc.left + 10, rc.top + 10, rc.right - 400, rc.bottom - 10);
+		RECT r;
+		GetWindowRect(m_hwnd, &r);
+
+		{
+			scene.left = rc.left + 20;
+			scene.top = rc.top + 100;
+			scene.right = rc.right - 20;
+			scene.bottom = rc.bottom - 100;
+		}
 
 		screenColor = D2D1::ColorF(D2D1::ColorF::White);
 
@@ -367,13 +379,13 @@ HRESULT MainWindow::CreateGraphicsResources()
 
 void MainWindow::IntitializeComponents()
 {
-	rectButton = CreateWindow(L"BUTTON", L"Rectangle", WS_CHILD | WS_BORDER | BS_PUSHBUTTON | WS_VISIBLE, 10, 10, 70, 35, m_hwnd, (HMENU)IDM_RECTPRESS, NULL, NULL);
-	ellipButton = CreateWindow(L"BUTTON", L"Ellipse", WS_CHILD | WS_BORDER | BS_PUSHBUTTON | WS_VISIBLE, 100, 10, 75, 35, m_hwnd, (HMENU)IDM_ELLIPPRESS, NULL, NULL);
-	clearButton = CreateWindow(L"BUTTON", L"Clean", WS_CHILD | WS_BORDER | BS_PUSHBUTTON | WS_VISIBLE, 190, 10, 75, 35, m_hwnd, (HMENU)IDM_CLEAR, NULL, NULL);
-	colorButton = CreateWindow(L"BUTTON", L"Color", WS_CHILD | WS_BORDER | BS_PUSHBUTTON | WS_VISIBLE, 370, 10, 75, 35, m_hwnd, (HMENU)IDM_COLOR, NULL, NULL);
-	penButton = CreateWindow(L"BUTTON", L"Pen", WS_CHILD | WS_BORDER | BS_PUSHBUTTON | WS_VISIBLE, 280, 10, 75, 35, m_hwnd, (HMENU)IDM_PEN, NULL, NULL);
-	clrButton = CreateWindow(L"BUTTON", L"Eraser", WS_CHILD | WS_BORDER | BS_PUSHBUTTON | WS_VISIBLE, 460, 10, 75, 35, m_hwnd, (HMENU)IDM_CLEANER, NULL, NULL);
-	flButton = CreateWindow(L"BUTTON", L"Fill", WS_CHILD | WS_BORDER | BS_PUSHBUTTON | WS_VISIBLE, 550, 10, 75, 35, m_hwnd, (HMENU)IDM_FILL, NULL, NULL);
+	rectButton = CreateWindow(L"BUTTON", L"Rectangle", WS_CHILD | WS_BORDER | BS_PUSHBUTTON | WS_VISIBLE, 10, 10, 100, 35, m_hwnd, (HMENU)IDM_RECTPRESS, NULL, NULL);
+	ellipButton = CreateWindow(L"BUTTON", L"Ellipse", WS_CHILD | WS_BORDER | BS_PUSHBUTTON | WS_VISIBLE, 130, 10, 100, 35, m_hwnd, (HMENU)IDM_ELLIPPRESS, NULL, NULL);
+	penButton = CreateWindow(L"BUTTON", L"Pen", WS_CHILD | WS_BORDER | BS_PUSHBUTTON | WS_VISIBLE, 250, 10, 100, 35, m_hwnd, (HMENU)IDM_PEN, NULL, NULL);
+	clearButton = CreateWindow(L"BUTTON", L"Clean", WS_CHILD | WS_BORDER | BS_PUSHBUTTON | WS_VISIBLE, 370, 10, 100, 35, m_hwnd, (HMENU)IDM_CLEAR, NULL, NULL);
+	colorButton = CreateWindow(L"BUTTON", L"Color", WS_CHILD | WS_BORDER | BS_PUSHBUTTON | WS_VISIBLE, 490, 10, 100, 35, m_hwnd, (HMENU)IDM_COLOR, NULL, NULL);
+	clrButton = CreateWindow(L"BUTTON", L"Eraser", WS_CHILD | WS_BORDER | BS_PUSHBUTTON | WS_VISIBLE, 610, 10, 100, 35, m_hwnd, (HMENU)IDM_CLEANER, NULL, NULL);
+	flButton = CreateWindow(L"BUTTON", L"Fill", WS_CHILD | WS_BORDER | BS_PUSHBUTTON | WS_VISIBLE, 730, 10, 100, 35, m_hwnd, (HMENU)IDM_FILL, NULL, NULL);
 	{
 		cc.Flags = CC_RGBINIT | CC_FULLOPEN;
 		cc.hInstance = NULL;
@@ -412,7 +424,7 @@ void MainWindow::CleanUp()
 	elipses.clear();
 	rects.clear();
 	pens.clear();
-	InvalidateRect(m_hwnd, NULL, FALSE);
+	InvalidateRect(m_hwnd, &scene, FALSE);
 }
 
 void MainWindow::FillArea(float x, float y)
@@ -468,7 +480,7 @@ void MainWindow::OnPaint()
 	if (SUCCEEDED(hr))
 	{
 		PAINTSTRUCT ps;
-		hdc = BeginPaint(m_hwnd, &ps);
+		BeginPaint(m_hwnd, &ps);
 
 		pRenderTarget->BeginDraw();
 		pRenderTarget->Clear(screenColor);
@@ -532,7 +544,7 @@ void MainWindow::Resize()
 
 		pRenderTarget->Resize(size);
 
-		InvalidateRect(m_hwnd, NULL, FALSE);
+		InvalidateRect(m_hwnd, &scene, FALSE);
 	}
 }
 
@@ -618,7 +630,7 @@ void MainWindow::OnLButtonDown(int pixelX, int pixelY, DWORD flags)
 		case Shape::Ellipse:
 			InsertEllipse(dipX, dipY);
 			break;
-		case Shape::Rectangle:
+		case Shape::Rect:
 			InsertRectangle(dipX, dipY);
 			break;
 		case Shape::Pen:
@@ -654,7 +666,7 @@ void MainWindow::OnMouseMove(int pixelX, int pixelY, DWORD flags)
 					map<int, MyEllipse>::reverse_iterator lElipse = elipses.rbegin();
 					(*lElipse).second.ellipse = D2D1::Ellipse(D2D1::Point2F(x1, y1), width, height);
 				}
-				if (shape == Shape::Rectangle)
+				if (shape == Shape::Rect)
 				{
 					map<int, MyRectangle>::reverse_iterator lRect = rects.rbegin();
 					 (*lRect).second.rect = D2D1::RectF((*lRect).second.rect.left, (*lRect).second.rect.top, dipX, dipY);
@@ -673,7 +685,7 @@ void MainWindow::OnMouseMove(int pixelX, int pixelY, DWORD flags)
 				}
 				break;
 		}
-		InvalidateRect(m_hwnd, NULL, FALSE);
+		InvalidateRect(m_hwnd, &scene, FALSE);
 	}
 }
 
@@ -684,15 +696,18 @@ void MainWindow::OnLButtonUp()
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR pCmdLine, int nCmdShow)
 {
+	SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
+
 	MainWindow win;
 
-	if (!win.Create(L"Paint", WS_OVERLAPPEDWINDOW))
+	if (!win.Create(L"Paint", WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN))
 	{
 		return 0;
 	}
+	win.IntitializeComponents();
 
 	ShowWindow(win.Window(), nCmdShow);
-	UpdateWindow(win.Window());
+	//UpdateWindow(win.Window());
 
 	MSG msg = {};
 	while (GetMessage(&msg, NULL, 0, 0))
@@ -716,7 +731,6 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 		{
 			return -1;  // Fail CreateWindowEx.
 		}
-		IntitializeComponents();
 		DPIScale::Initialize(pFactory);
 		SetMode(Mode::Draw);
 		SetShape(Shape::Ellipse);
@@ -750,7 +764,7 @@ LRESULT MainWindow::HandleMessage(UINT uMsg, WPARAM wParam, LPARAM lParam)
 		{
 		case IDM_RECTPRESS:
 			SetMode(Mode::Draw);
-			SetShape(Shape::Rectangle);
+			SetShape(Shape::Rect);
 			return 0;
 		case IDM_ELLIPPRESS:
 			SetMode(Mode::Draw);
